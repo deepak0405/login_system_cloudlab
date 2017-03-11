@@ -1,0 +1,138 @@
+#!/usr/bin/python
+# Abhishek, 21/12/16, this scripts extract user info(uid, groups)
+
+#useradd -u 1000 -g 500 tarunika
+import commands,sys,os
+import shlex
+userinfo = dict()
+os.system("rm /root/cloudlab/push_users.sh")
+os.system("rm /root/cloudlab/delusers.sh")
+
+def getusers():
+	users = dict()
+	userfile = '/root/cloudlab/users'
+	readuserfile = open(userfile,"r")
+
+# Opening file to write errors
+	errorfile = '/root/cloudlab/errors'
+	errors = open(errorfile,"a")
+
+	for user in readuserfile:
+		user = user.rstrip()
+		status, userdetails = commands.getstatusoutput("id %s"%user)
+
+# Checking if user doesn't exist in LDAP
+		if status != 0:
+			errors.write(user + " doesn't exist in LDAP")
+
+		else:
+			userdetails = userdetails.split(' ')
+# Getting UID number
+			uidn = userdetails[0].split('(')[0].split('=')[1]
+# Getting UID 
+			uid = userdetails[0].split('(')[1][:-1]
+# Getting GID number
+			gidn = userdetails[1].split('(')[0].split('=')[1]
+# Getting GID 
+			gid = userdetails[1].split('(')[1][:-1]
+			userinfo[uid] = dict()
+		
+# If user is member of multiple groups following block will run
+			if (',' in userdetails[2]):
+				groups = userdetails[2].split(',')
+				l = len(groups)
+				group = groups[0].split('=')[1].split('(')[1][:-1]
+				userinfo[uid]['group0'] = group
+				j = 1
+				userinfo[uid]['uid'] = uid
+				userinfo[uid]['uidn'] = uidn
+				userinfo[uid]['len'] = int(l)
+				userinfo[uid]['gidn']=gidn
+				userinfo[uid]['gid']=gid
+				while (j<= (l - 1)):
+					group = groups[j].split('(')[1][:-1]
+					userinfo[uid]['group'+str(j)] = group
+					j = j + 1	
+
+# if user belongs to single group following block will run
+			else:
+				userinfo[uid]['uid'] = uid
+				userinfo[uid]['uidn'] = uidn
+				userinfo[uid]['gid'] = gid
+				userinfo[uid]['gidn']=gidn
+				userinfo[uid]['len']=0
+	readuserfile.close()
+	return userinfo
+
+
+# Defining function to generate push_users.sh
+def push_users():
+	#calling function getusers()
+	users=getusers()
+
+	# Opening bash "push_users.sh" file to write commands
+	userfile = "/root/cloudlab/push_users.sh"
+	pushusers = open(userfile,"a")
+
+	# Opening bash "delusers.sh" file to write commands
+	deleteuser = "/root/cloudlab/delusers.sh"
+	delusers = open(deleteuser,"a")
+
+	uid = ""
+	group = ""
+	uidn = ""
+
+	for key in users:
+# Getting uid number of a user
+		uidn = users[key]['uidn']
+		if users[key]['len']==0:
+			gid = users[key]['gid']
+# writing useradd command to file "push_users.sh" with uid number
+			pushusers.write("useradd -u %s -G" %(users[key]['uidn']))
+# writing userdel command to file "delusers.sh" with uid 
+			delusers.write("userdel %s"%(users[key]['uid'])+"\n")
+			delusers.write("rm -rf /mnt/plos/home/%s" %(users[key]['uid'])+"\n")
+# Adding user to group
+			pushusers.write(" %s %s"%(users[key]['gid'],users[key]['uid'])+"\n")
+# changing primary group
+			pushusers.write("usermod -g %s %s" %(users[key]['gid'],users[key]['uid'])+"\n")
+# Deleting group existed with username(eg deepak)
+			pushusers.write("groupdel %s"%(users[key]['uid'])+"\n")
+# Creating home directory
+			pushusers.write("mkdir /mnt/plos/home/%s" %(users[key]['uid'])+"\n")
+			pushusers.write("chown -R %s:%s /mnt/plos/home/%s" %(users[key]['uid'],gid,users[key]['uid'])+"\n")
+		
+# if user is member of multiple groups following block will run
+		else:
+		# Getting number of groups a user belongs to
+			l = users[key]['len']
+			for key1 in users[key]:
+				if 'uid' in key1 and not 'uidn' in key1:
+					uid = users[key][key1]
+
+				elif 'group' in key1:
+					group += str(users[key][key1]) + ","
+
+			group = group[:-1]
+			group = group +" "+uid
+			primarygroup = users[key]['gid']+" "+uid
+# Adding user to groups
+			pushusers.write("useradd -u %s" %(uidn))
+			pushusers.write(" -G %s"%(primarygroup)+"\n")
+# Writing commands to deleting users to deluser.sh
+			delusers.write("userdel %s"%(uid+"\n"))
+			pushusers.write("usermod -g %s"%(primarygroup)+"\n")
+			pushusers.write("groupdel %s"%(users[key]['uid']+"\n"))
+#  Changing primary group
+			pushusers.write("usermod -a -G %s" %(group+"\n"))
+			pushusers.write("mkdir /mnt/plos/home/%s" %(users[key]['uid'])+"\n")
+#  Writing command to delete the user to delusers.sh
+			delusers.write("rm -rf /mnt/plos/home/%s" %(users[key]['uid'])+"\n")
+			pushusers.write("chown -R %s:%s /mnt/plos/home/%s" %(uid,users[key]['group'+str(l-1)],uid+"\n"))
+#			print users[uid]['group'+str(l)]
+			group = ""
+	pushusers.close()
+	delusers.close()
+	
+
+push_users()

@@ -1,0 +1,7 @@
+ List the groups to be added in group_add.txt, one group each line.
+ List the groups to be deleted in group_delete.py , one group each line.
+ Compiling group_add.py or group_delete.py will generate group_add.sh and group_delete.sh respectively.
+ Execute group_add.sh to add groups.
+ Execute group_delete.sh to delete groups.
+ Any error encountered will be written in error.txt
+

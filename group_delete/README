@@ -1,0 +1,3 @@
+1. Add ip address or domain names of the system whose group you want to delete to systems.txt
+2. Compile multiple_hosts.py.
+3. Check for errors in errors.txt .

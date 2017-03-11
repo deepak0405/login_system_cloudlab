@@ -1,0 +1,3 @@
+1. Write the name of the systems to which you want to add all the gid groups to    systems.txt.
+2. Compile multiple_hosts.py.
+3. Error encountered while adding some group will be written in errors.txt.

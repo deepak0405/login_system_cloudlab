@@ -1,0 +1,3 @@
+groupadd: GID '1000' already exists
+groupadd: GID '60' already exists
+groupadd: GID '7889' already exists
